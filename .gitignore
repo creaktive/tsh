@@ -3,5 +3,6 @@
 *.exe
 *.o
 *.tgz
+ref/*
 tsh
 tshd

@@ -1,6 +1,13 @@
+CC		= gcc
+RM		= rm -f
+STRIP		= strip
+CFLAGS		= -O3 -W -Wall
 
-CLIENT_OBJ=pel.c aes.c sha1.c  tsh.c
-SERVER_OBJ=pel.c aes.c sha1.c tshd.c
+TOOLCHAIN	= /var/toolchain/sys30
+
+COMM		= pel.o aes.o sha1.o
+TSH		= tsh
+TSHD		= tshd
 
 all:
 	@echo
@@ -15,50 +22,86 @@ all:
 	@echo "	make irix"
 	@echo "	make hpux"
 	@echo "	make osf"
+	@echo "	make iphone"
 	@echo
 
-clean:
-	rm -f *.o tsh tshd
+iphone:
+	$(MAKE)								\
+		CFLAGS="$(CFLAGS) -I$(TOOLCHAIN)/usr/include"		\
+		LDFLAGS="$(LDFLAGS) -L$(TOOLCHAIN)/usr/lib -lutil"	\
+		DEFS="$(DEFS) -DOPENBSD"				\
+		$(TSH) $(TSHD)
+	ldid -S $(TSH)
+	ldid -S $(TSHD)
 
 linux:
-	gcc -O -W -Wall -o tsh  $(CLIENT_OBJ)
-	gcc -O -W -Wall -o tshd $(SERVER_OBJ) -lutil -DLINUX
-	strip tsh tshd
-
-freebsd:
-	gcc -O -W -Wall -o tsh  $(CLIENT_OBJ)
-	gcc -O -W -Wall -o tshd $(SERVER_OBJ) -lutil -DFREEBSD
-	strip tsh tshd
+	$(MAKE)								\
+		LDFLAGS="$(LDFLAGS) -lutil"				\
+		DEFS="$(DEFS) -DLINUX"					\
+		$(TSH) $(TSHD)
 
 openbsd:
-	gcc -O -W -Wall -o tsh  $(CLIENT_OBJ)
-	gcc -O -W -Wall -o tshd $(SERVER_OBJ) -lutil -DOPENBSD
-	strip tsh tshd
+	$(MAKE)								\
+		LDFLAGS="$(LDFLAGS) -lutil"				\
+		DEFS="$(DEFS) -DOPENBSD"				\
+		$(TSH) $(TSHD)
+
+freebsd:
+	$(MAKE)								\
+		LDFLAGS="$(LDFLAGS) -lutil"				\
+		DEFS="$(DEFS) -DFREEBSD"				\
+		$(TSH) $(TSHD)
 
 netbsd: openbsd
 
-cygwin:
-	gcc -O -W -Wall -o tsh  $(CLIENT_OBJ)
-	gcc -O -W -Wall -o tshd $(SERVER_OBJ) -DCYGWIN
-	strip tsh tshd
-
 sunos:
-	gcc -O -W -Wall -o tsh  $(CLIENT_OBJ) -lsocket -lnsl
-	gcc -O -W -Wall -o tshd $(SERVER_OBJ) -lsocket -lnsl -DSUNOS
-	strip tsh tshd
+	$(MAKE)								\
+		LDFLAGS="$(LDFLAGS) -lsocket -lnsl"			\
+		DEFS="$(DEFS) -DSUNOS"					\
+		$(TSH) $(TSHD)
+
+cygwin:
+	$(MAKE)								\
+		DEFS="$(DEFS) -DCYGWIN"					\
+		$(TSH) $(TSHD)
 
 irix:
-	cc -O -o tsh  $(CLIENT_OBJ)
-	cc -O -o tshd $(SERVER_OBJ) -DIRIX
-	strip tsh tshd
+	$(MAKE)								\
+		CC="cc"							\
+		CFLAGS="-O"						\
+		DEFS="$(DEFS) -DIRIX"					\
+		$(TSH) $(TSHD)
 
 hpux:
-	cc -O -o tsh  $(CLIENT_OBJ)
-	cc -O -o tshd $(SERVER_OBJ) -DHPUX
-	strip tsh tshd
+	$(MAKE)								\
+		CC="cc"							\
+		CFLAGS="-O"						\
+		DEFS="$(DEFS) -DHPUX"					\
+		$(TSH) $(TSHD)
 
 osf:
-	cc -O -o tsh  $(CLIENT_OBJ)
-	cc -O -o tshd $(SERVER_OBJ) -DOSF
-	strip tsh tshd
+	$(MAKE)								\
+		CC="cc"							\
+		CFLAGS="-O"						\
+		DEFS="$(DEFS) -DOSF"					\
+		$(TSH) $(TSHD)
 
+$(TSH): $(COMM) tsh.o
+	$(CC) ${LDFLAGS} -o $(TSH) $(COMM) tsh.o
+	$(STRIP) $(TSH)
+
+$(TSHD): $(COMM) tshd.o
+	$(CC) ${LDFLAGS} -o $(TSHD) $(COMM) tshd.o
+	$(STRIP) $(TSHD)
+
+aes.o: aes.h
+pel.o: aes.h pel.h sha1.h
+sha1.o: sha1.h
+tsh.o: pel.h tsh.h
+tshd.o: pel.h tsh.h
+
+.c.o:
+	$(CC) ${CFLAGS} ${DEFS} -c $*.c
+
+clean:
+	$(RM) $(TSH) $(TSHD) *.o core
