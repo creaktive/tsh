@@ -14,6 +14,7 @@ all:
 	@echo "Please specify one of these targets:"
 	@echo
 	@echo "	make linux"
+	@echo "	make linux_x64"
 	@echo "	make freebsd"
 	@echo "	make openbsd"
 	@echo "	make netbsd"
@@ -37,6 +38,12 @@ iphone:
 linux:
 	$(MAKE)								\
 		LDFLAGS="$(LDFLAGS) -lutil"				\
+		DEFS="$(DEFS) -DLINUX"					\
+		$(TSH) $(TSHD)
+
+linux_x64:
+	$(MAKE)								\
+		LDFLAGS="$(LDFLAGS) -Xlinker --no-as-needed -lutil"	\
 		DEFS="$(DEFS) -DLINUX"					\
 		$(TSH) $(TSHD)
 
