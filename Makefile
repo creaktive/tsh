@@ -24,7 +24,17 @@ all:
 	@echo "	make hpux"
 	@echo "	make osf"
 	@echo "	make iphone"
+	@echo "	make darwin"
 	@echo
+
+osx: darwin
+
+darwin:
+	$(MAKE)								\
+		CC="clang"						\
+		LDFLAGS="$(LDFLAGS) -lutil"				\
+		DEFS="$(DEFS) -DOPENBSD"				\
+		$(TSH) $(TSHD)
 
 iphone:
 	$(MAKE)								\
