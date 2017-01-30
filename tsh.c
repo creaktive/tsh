@@ -20,6 +20,8 @@
 #include "pel.h"
 
 unsigned char message[BUFSIZE + 1];
+extern char *optarg;
+extern int optind;
 
 /* function declaration */
 
@@ -31,26 +33,54 @@ void pel_error( char *s );
 
 /* program entry point */
 
+void usage(char *argv0)
+{
+    fprintf(stderr, "Usage: %s [ -s secret ] [ -p port ] [command]\n"
+        "\n"
+        "   <hostname|cb>\n"
+        "   <hostname|cb> get <source-file> <dest-dir>\n"
+        "   <hostname|cb> put <source-file> <dest-dir>\n", argv0);
+    exit(1);
+}
+
 int main( int argc, char *argv[] )
 {
-    int ret, client, server, n;
+    int ret, client, server;
+    socklen_t n;
+    int opt;
     struct sockaddr_in server_addr;
     struct sockaddr_in client_addr;
     struct hostent *server_host;
     char action, *password;
 
+    while ((opt = getopt(argc, argv, "p:s:")) != -1) {
+        switch (opt) {
+            case 'p':
+                server_port=atoi(optarg); /* We hope ... */
+                if (!server_port) usage(*argv);
+                break;
+            case 's':
+                secret=optarg; 
+                break;
+            default: /* '?' */
+                usage(*argv);
+                break;
+        }
+    }
+    argv+=(optind-1);
+    argc-=(optind-1);
     action = 0;
 
     password = NULL;
 
     /* check the arguments */
 
-    if( argc == 5 && ! strcmp( argv[2], "get" ) )
+    if( argc== 5 && ! strcmp( argv[2], "get" ) )
     {
         action = GET_FILE;
     }
 
-    if( argc == 5 && ! strcmp( argv[2], "put" ) )
+    if( argc== 5 && ! strcmp( argv[2], "put" ) )
     {
         action = PUT_FILE;
     }
@@ -76,13 +106,11 @@ connect:
             return( 2 );
         }
 
-        /* resolve the server hostname */
-
         server_host = gethostbyname( argv[1] );
 
         if( server_host == NULL )
         {
-            fprintf( stderr, "gethostbyname failed.\n" );
+            perror( "gethostbyname");
             return( 3 );
         }
 
@@ -91,7 +119,7 @@ connect:
                 server_host->h_length );
 
         server_addr.sin_family = AF_INET;
-        server_addr.sin_port   = htons( SERVER_PORT );
+        server_addr.sin_port   = htons( server_port );
 
         /* connect to the remote host */
 
@@ -130,7 +158,7 @@ connect:
         }
 
         client_addr.sin_family      = AF_INET;
-        client_addr.sin_port        = htons( SERVER_PORT );
+        client_addr.sin_port        = htons( server_port );
         client_addr.sin_addr.s_addr = INADDR_ANY;
 
         ret = bind( client, (struct sockaddr *) &client_addr,

@@ -9,6 +9,20 @@ COMM		= pel.o aes.o sha1.o
 TSH		= tsh
 TSHD		= tshd
 
+VERSION=tsh-0.7
+CLIENT_OBJ=pel.c aes.c sha1.c  tsh.c
+SERVER_OBJ=pel.c aes.c sha1.c tshd.c
+
+DISTFILES= \
+    sha1.h \
+    README \
+    ChangeLog\
+    pel.h \
+    Makefile \
+    aes.h\
+    tsh.h\
+    $(CLIENT_OBJ) $(SERVER_OBJ)
+
 all:
 	@echo
 	@echo "Please specify one of these targets:"
@@ -26,6 +40,7 @@ all:
 	@echo "	make iphone"
 	@echo "	make darwin"
 	@echo
+	make `uname | tr A-Z a-z`
 
 osx: darwin
 
@@ -46,10 +61,9 @@ iphone:
 	ldid -S $(TSHD)
 
 linux:
-	$(MAKE)								\
-		LDFLAGS="$(LDFLAGS) -lutil"				\
-		DEFS="$(DEFS) -DLINUX"					\
-		$(TSH) $(TSHD)
+	gcc -O -W -Wall -o tsh  $(CLIENT_OBJ)
+	gcc -O -W -Wall -o tshd $(SERVER_OBJ) -lutil -DLINUX
+	strip tsh tshd
 
 linux_x64:
 	$(MAKE)								\
@@ -122,3 +136,11 @@ tshd.o: pel.h tsh.h
 
 clean:
 	$(RM) $(TSH) $(TSHD) *.o core
+
+
+dist:
+	mkdir $(VERSION)
+	cp $(DISTFILES) $(VERSION)
+	tar -czf $(VERSION).tar.gz $(VERSION)
+	rm -r $(VERSION)
+
