@@ -253,9 +253,9 @@ int pel_send_msg( int sockfd, unsigned char *msg, int length )
 
     /* compute the HMAC-SHA1 of the ciphertext */
 
-    buffer[blk_len    ] = ( send_ctx.p_cntr << 24 ) & 0xFF;
-    buffer[blk_len + 1] = ( send_ctx.p_cntr << 16 ) & 0xFF;
-    buffer[blk_len + 2] = ( send_ctx.p_cntr <<  8 ) & 0xFF;
+    buffer[blk_len    ] = ( send_ctx.p_cntr >> 24 ) & 0xFF;
+    buffer[blk_len + 1] = ( send_ctx.p_cntr >> 16 ) & 0xFF;
+    buffer[blk_len + 2] = ( send_ctx.p_cntr >>  8 ) & 0xFF;
     buffer[blk_len + 3] = ( send_ctx.p_cntr       ) & 0xFF;
 
     sha1_starts( &sha1_ctx );
@@ -344,9 +344,9 @@ int pel_recv_msg( int sockfd, unsigned char *msg, int *length )
 
     /* verify the ciphertext integrity */
 
-    buffer[blk_len    ] = ( recv_ctx.p_cntr << 24 ) & 0xFF;
-    buffer[blk_len + 1] = ( recv_ctx.p_cntr << 16 ) & 0xFF;
-    buffer[blk_len + 2] = ( recv_ctx.p_cntr <<  8 ) & 0xFF;
+    buffer[blk_len    ] = ( recv_ctx.p_cntr >> 24 ) & 0xFF;
+    buffer[blk_len + 1] = ( recv_ctx.p_cntr >> 16 ) & 0xFF;
+    buffer[blk_len + 2] = ( recv_ctx.p_cntr >>  8 ) & 0xFF;
     buffer[blk_len + 3] = ( recv_ctx.p_cntr       ) & 0xFF;
 
     sha1_starts( &sha1_ctx );
